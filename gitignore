@@ -1,0 +1,6 @@
+# Nunca versione segredos
+.env
+*.env
+*.key
+*.pem
+secrets*
