@@ -1,0 +1,44 @@
+name: auto-update-n8n
+
+on:
+  schedule:
+    - cron: '0 6 * * *'     # todo dia às 06:00 UTC (03:00 BRT)
+  workflow_dispatch: {}      # permite rodar manualmente pelo botão "Run workflow"
+
+permissions:
+  contents: write            # necessário pra dar commit/push no próprio repo
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descobrir a versão mais recente do n8n
+        id: latest
+        run: |
+          # ── ESCOLHA O COMPORTAMENTO ──────────────────────────────
+          # RECOMENDADO (seguro): só atualiza DENTRO do major 2 (não pula pra 3.x sozinho)
+          FILTER='^2\.[0-9]+\.[0-9]+$'
+          # SEMPRE A ÚLTIMA DE TUDO (arriscado): descomente a linha abaixo
+          # FILTER='^[0-9]+\.[0-9]+\.[0-9]+$'
+          # ─────────────────────────────────────────────────────────
+          VER=$(curl -s "https://hub.docker.com/v2/repositories/n8nio/n8n/tags?page_size=100&ordering=last_updated" \
+            | jq -r '.results[].name' \
+            | grep -E "$FILTER" \
+            | sort -V | tail -n1)
+          echo "Versão mais recente encontrada: $VER"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Atualizar o Dockerfile e dar push se mudou
+        run: |
+          test -n "${{ steps.latest.outputs.version }}" || { echo "Não consegui descobrir a versão"; exit 1; }
+          sed -i -E "s|^FROM n8nio/n8n:.*|FROM n8nio/n8n:${{ steps.latest.outputs.version }}|" Dockerfile
+          if git diff --quiet; then
+            echo "Já está na versão mais recente. Nada a fazer."
+          else
+            git config user.name "n8n-version-bot"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: atualiza n8n para ${{ steps.latest.outputs.version }}"
+            git push
+          fi
