@@ -1,6 +1,6 @@
 FROM mwader/static-ffmpeg:latest AS ffmpeg
 
-FROM n8nio/n8n:2.29.6
+FROM n8nio/n8n:2.30.0
 USER root
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
